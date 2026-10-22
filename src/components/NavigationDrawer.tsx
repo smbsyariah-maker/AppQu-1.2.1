@@ -23,7 +23,6 @@ interface NavigationDrawerProps {
   printerConfig: PrinterConfig;
   occupiedTablesCount: number;
   onBackToAppQu?: () => void;
-  onCheckUpdate?: () => void;
 }
 
 export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
@@ -35,7 +34,6 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
   printerConfig,
   occupiedTablesCount,
   onBackToAppQu,
-  onCheckUpdate,
 }) => {
   if (!isOpen) return null;
 
@@ -167,29 +165,6 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
           >
             <span>Atur Printer & Menu</span>
             <ChevronRight className="w-3 h-3" />
-          </button>
-        </div>
-
-        {/* Auto Update Quick Trigger */}
-        <div className="p-3 mx-3 mb-2 rounded-2xl bg-stone-800/80 border border-stone-700/60 space-y-1.5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-stone-200">
-              <Sparkles className="w-3.5 h-3.5 text-teal-400" />
-              <span>Versi Aplikasi</span>
-            </div>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 font-bold">
-              v1.2.1
-            </span>
-          </div>
-          <button
-            onClick={() => {
-              if (onCheckUpdate) onCheckUpdate();
-              onClose();
-            }}
-            className="w-full py-1.5 px-2 bg-gradient-to-r from-emerald-800 to-teal-800 hover:from-emerald-700 hover:to-teal-700 text-white rounded-lg text-[11px] font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs active:scale-98"
-          >
-            <Sparkles className="w-3 h-3 text-amber-300" />
-            <span>Cek Pembaruan Versi</span>
           </button>
         </div>
 

@@ -28,7 +28,6 @@ interface AppQuHeaderProps {
   onSwitchToRitelQu?: () => void;
   onOpenArsitektur: () => void;
   onOpenHierarchy?: () => void;
-  onCheckUpdate?: () => void;
   activeModuleName: string;
   unreadChatCount?: number;
 }
@@ -44,7 +43,6 @@ export const AppQuHeader: React.FC<AppQuHeaderProps> = ({
   onSwitchToRitelQu,
   onOpenArsitektur,
   onOpenHierarchy,
-  onCheckUpdate,
   activeModuleName,
   unreadChatCount = 1,
 }) => {
@@ -68,16 +66,6 @@ export const AppQuHeader: React.FC<AppQuHeaderProps> = ({
             <span className="text-[10px] font-semibold text-amber-300">
               RT 04 / RW 09
             </span>
-            {onCheckUpdate && (
-              <button
-                onClick={onCheckUpdate}
-                title="Cek Pembaruan Versi Aplikasi"
-                className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-900/90 hover:bg-emerald-800 text-emerald-300 border border-emerald-700/50 flex items-center gap-1 cursor-pointer transition-colors"
-              >
-                <Sparkles className="w-2.5 h-2.5 text-amber-300" />
-                <span>v1.2.1</span>
-              </button>
-            )}
           </div>
           <p className="text-[10px] text-emerald-200/80 truncate max-w-[130px] xs:max-w-[180px]">
             {activeModuleName}

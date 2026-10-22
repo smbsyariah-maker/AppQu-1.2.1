@@ -715,31 +715,5 @@ export interface ChatReportRecord {
   timestamp: string;
 }
 
-// ==========================================
-// APP AUTO UPDATE & GITHUB RELEASE TYPES
-// ==========================================
-export interface AppUpdateInfo {
-  version: string;
-  versionCode?: number;
-  tagName: string;
-  releaseName: string;
-  releaseDate: string;
-  changelog: string;
-  apkDownloadUrl: string;
-  apkName: string;
-  fileSizeMb?: number;
-  isNewer: boolean;
-  mandatory?: boolean;
-}
-
-export interface UpdateConfig {
-  repoOwner: string;
-  repoName: string;
-  autoCheckOnStartup: boolean;
-  lastCheckedAt?: string;
-  dismissedVersion?: string;
-}
-
-
 
 

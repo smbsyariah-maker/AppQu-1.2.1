@@ -28,7 +28,6 @@ import { ChatQuView } from './components/appqu/ChatQuView';
 import { BengkelQuView } from './components/bengkel/BengkelQuView';
 import { KlinikQuView } from './components/klinik/KlinikQuView';
 import { RitelQuView } from './components/ritel/RitelQuView';
-import { AppUpdateModal } from './components/update/AppUpdateModal';
 
 import {
   TableItem,
@@ -52,13 +51,11 @@ import {
   PiketTask,
   AreaPoint,
   TransportasiCourier,
-  AppUpdateInfo,
 } from './types';
 
 import { StorageService } from './services/storage';
 import { AppQuStorageService, PRESET_USERS, PendingVerificationItem } from './services/storageAppQu';
 import { PrinterService } from './services/printer';
-import { UpdateService } from './services/updateService';
 
 export default function App() {
   // ====================================================
@@ -137,15 +134,6 @@ export default function App() {
     isKitchenSlip: false,
   });
 
-  // Auto Update Modal State
-  const [updateModalState, setUpdateModalState] = useState<{
-    isOpen: boolean;
-    updateInfo: AppUpdateInfo | null;
-  }>({
-    isOpen: false,
-    updateInfo: null,
-  });
-
   // Global Notification Toast
   const [notification, setNotification] = useState<string | null>(null);
 
@@ -176,33 +164,11 @@ export default function App() {
     setActiveOrders(StorageService.getActiveOrders());
     setProfile(StorageService.getProfile());
     setPrinterConfig(StorageService.getPrinterConfig());
-
-    // Auto-check GitHub Releases update if enabled
-    const updateCfg = UpdateService.getUpdateConfig();
-    if (updateCfg.autoCheckOnStartup) {
-      UpdateService.checkForUpdate(false).then((res) => {
-        if (res.hasUpdate && res.updateInfo) {
-          setUpdateModalState({ isOpen: true, updateInfo: res.updateInfo });
-        }
-      });
-    }
   }, []);
 
   const showNotification = (msg: string) => {
     setNotification(msg);
     setTimeout(() => setNotification(null), 3000);
-  };
-
-  const handleCheckUpdate = async (isManual = true) => {
-    if (isManual) {
-      showNotification('Memeriksa pembaruan di GitHub Releases...');
-    }
-    const res = await UpdateService.checkForUpdate(isManual);
-    if (res.hasUpdate && res.updateInfo) {
-      setUpdateModalState({ isOpen: true, updateInfo: res.updateInfo });
-    } else if (isManual) {
-      showNotification(res.message);
-    }
   };
 
   // Chain of Trust Handlers: Approve & Reject Resident
@@ -599,7 +565,6 @@ export default function App() {
             onSwitchToRitelQu={handleSwitchToRitelQu}
             onOpenArsitektur={() => setActiveAppQuModule('arsitektur')}
             onOpenHierarchy={() => setIsHierarchyModalOpen(true)}
-            onCheckUpdate={() => handleCheckUpdate(true)}
             activeModuleName={getAppQuModuleName()}
             unreadChatCount={1}
           />
@@ -830,9 +795,6 @@ export default function App() {
                   StorageService.saveMenu(newMenu);
                   showNotification('Daftar menu berhasil diperbarui.');
                 }}
-                onTriggerUpdateModal={(info) =>
-                  setUpdateModalState({ isOpen: true, updateInfo: info })
-                }
               />
             )}
           </main>
@@ -854,7 +816,6 @@ export default function App() {
             printerConfig={printerConfig}
             occupiedTablesCount={occupiedTablesCount}
             onBackToAppQu={handleReturnToAppQu}
-            onCheckUpdate={() => handleCheckUpdate(true)}
           />
 
           {/* Quick Bluetooth Status Modal */}
@@ -975,14 +936,6 @@ export default function App() {
           showNotification={showNotification}
         />
       )}
-
-      {/* Global In-App Auto Update Modal */}
-      <AppUpdateModal
-        isOpen={updateModalState.isOpen}
-        onClose={() => setUpdateModalState({ isOpen: false, updateInfo: null })}
-        updateInfo={updateModalState.updateInfo}
-        onDismissVersion={(ver) => UpdateService.dismissVersion(ver)}
-      />
     </AndroidFrame>
   );
 }

@@ -13,17 +13,10 @@ import {
   X,
   Check,
   Smartphone,
-  Info,
-  Sparkles,
-  Download,
-  ExternalLink,
-  Code2,
-  ShieldCheck,
-  AlertCircle
+  Info
 } from 'lucide-react';
-import { RestaurantProfile, PrinterConfig, MenuItem, MenuCategory, AppUpdateInfo } from '../../types';
+import { RestaurantProfile, PrinterConfig, MenuItem, MenuCategory } from '../../types';
 import { PrinterService } from '../../services/printer';
-import { UpdateService, APP_CURRENT_VERSION } from '../../services/updateService';
 
 interface SettingViewProps {
   profile: RestaurantProfile;
@@ -32,7 +25,6 @@ interface SettingViewProps {
   onSavePrinterConfig: (config: PrinterConfig) => void;
   menuList: MenuItem[];
   onSaveMenu: (menu: MenuItem[]) => void;
-  onTriggerUpdateModal?: (info: AppUpdateInfo) => void;
 }
 
 export const SettingView: React.FC<SettingViewProps> = ({
@@ -42,22 +34,8 @@ export const SettingView: React.FC<SettingViewProps> = ({
   onSavePrinterConfig,
   menuList,
   onSaveMenu,
-  onTriggerUpdateModal,
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'toko' | 'menu' | 'printer' | 'update'>('toko');
-
-  // Update & GitHub CI/CD state
-  const initialUpdateCfg = UpdateService.getUpdateConfig();
-  const [repoOwner, setRepoOwner] = useState(initialUpdateCfg.repoOwner || 'smbsyariah');
-  const [repoName, setRepoName] = useState(initialUpdateCfg.repoName || 'bakso-qu-pos');
-  const [autoCheckStartup, setAutoCheckStartup] = useState(initialUpdateCfg.autoCheckOnStartup ?? true);
-  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
-  const [updateFeedback, setUpdateFeedback] = useState<{
-    msg: string;
-    type: 'success' | 'info' | 'error';
-    info?: AppUpdateInfo | null;
-  } | null>(null);
-  const [githubSavedMsg, setGithubSavedMsg] = useState(false);
+  const [activeSubTab, setActiveSubTab] = useState<'toko' | 'menu' | 'printer'>('toko');
 
   // Profile Form state
   const [name, setName] = useState(profile.name);
@@ -202,102 +180,44 @@ export const SettingView: React.FC<SettingViewProps> = ({
     }
   };
 
-  const handleSaveGithubSettings = (e: React.FormEvent) => {
-    e.preventDefault();
-    UpdateService.saveUpdateConfig({
-      repoOwner: repoOwner.trim(),
-      repoName: repoName.trim(),
-      autoCheckOnStartup: autoCheckStartup,
-    });
-    setGithubSavedMsg(true);
-    setTimeout(() => setGithubSavedMsg(false), 2500);
-  };
-
-  const handleCheckUpdateNow = async () => {
-    setIsCheckingUpdate(true);
-    setUpdateFeedback(null);
-    try {
-      const res = await UpdateService.checkForUpdate(true);
-      if (res.hasUpdate && res.updateInfo) {
-        setUpdateFeedback({
-          msg: `Pembaruan Versi v${res.updateInfo.version} Tersedia!`,
-          type: 'success',
-          info: res.updateInfo,
-        });
-        if (onTriggerUpdateModal) {
-          onTriggerUpdateModal(res.updateInfo);
-        }
-      } else if (res.error) {
-        setUpdateFeedback({
-          msg: res.message,
-          type: 'error',
-        });
-      } else {
-        setUpdateFeedback({
-          msg: res.message || `Aplikasi Anda sudah versi terbaru (v${APP_CURRENT_VERSION}).`,
-          type: 'info',
-        });
-      }
-    } catch (e: any) {
-      setUpdateFeedback({
-        msg: 'Gagal memeriksa pembaruan: ' + e.message,
-        type: 'error',
-      });
-    } finally {
-      setIsCheckingUpdate(false);
-    }
-  };
-
   return (
     <div className="flex-1 flex flex-col overflow-y-auto p-3.5 space-y-3 pb-24 text-stone-900">
       {/* Sub-Tabs Switcher */}
-      <div className="grid grid-cols-4 gap-1 bg-stone-200/80 p-1 rounded-2xl shrink-0">
+      <div className="grid grid-cols-3 gap-1 bg-stone-200/80 p-1 rounded-2xl shrink-0">
         <button
           onClick={() => setActiveSubTab('toko')}
-          className={`py-2 px-1 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 ${
+          className={`py-2 px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
             activeSubTab === 'toko'
               ? 'bg-white text-stone-900 shadow-xs'
               : 'text-stone-600 hover:text-stone-900'
           }`}
         >
-          <Store className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-          <span className="truncate text-[11px]">Profil</span>
+          <Store className="w-3.5 h-3.5 text-amber-600" />
+          <span>Profil Resto</span>
         </button>
 
         <button
           onClick={() => setActiveSubTab('menu')}
-          className={`py-2 px-1 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 ${
+          className={`py-2 px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
             activeSubTab === 'menu'
               ? 'bg-white text-stone-900 shadow-xs'
               : 'text-stone-600 hover:text-stone-900'
           }`}
         >
-          <UtensilsCrossed className="w-3.5 h-3.5 text-red-600 shrink-0" />
-          <span className="truncate text-[11px]">Menu</span>
+          <UtensilsCrossed className="w-3.5 h-3.5 text-red-600" />
+          <span>Kelola Menu</span>
         </button>
 
         <button
           onClick={() => setActiveSubTab('printer')}
-          className={`py-2 px-1 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 ${
+          className={`py-2 px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
             activeSubTab === 'printer'
               ? 'bg-white text-stone-900 shadow-xs'
               : 'text-stone-600 hover:text-stone-900'
           }`}
         >
-          <Printer className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-          <span className="truncate text-[11px]">Printer</span>
-        </button>
-
-        <button
-          onClick={() => setActiveSubTab('update')}
-          className={`py-2 px-1 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 ${
-            activeSubTab === 'update'
-              ? 'bg-white text-stone-900 shadow-xs'
-              : 'text-stone-600 hover:text-stone-900'
-          }`}
-        >
-          <Sparkles className="w-3.5 h-3.5 text-teal-600 shrink-0" />
-          <span className="truncate text-[11px]">Update</span>
+          <Printer className="w-3.5 h-3.5 text-emerald-600" />
+          <span>Bluetooth</span>
         </button>
       </div>
 
@@ -564,212 +484,6 @@ export const SettingView: React.FC<SettingViewProps> = ({
                 <span>Uji Coba Tes Cetak Struk (Test Print)</span>
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 4: GITHUB CI/CD & AUTO UPDATE */}
-      {activeSubTab === 'update' && (
-        <div className="space-y-3">
-          {/* Card 1: Status Versi & Cek Update */}
-          <div className="p-4 rounded-3xl bg-white border border-stone-200 shadow-xs space-y-3.5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-teal-500/10 text-teal-700 flex items-center justify-center">
-                  <Sparkles className="w-4 h-4 text-teal-600" />
-                </div>
-                <div>
-                  <h3 className="text-xs font-extrabold text-stone-900 uppercase tracking-wider">
-                    Pembaruan Versi & Rilis
-                  </h3>
-                  <p className="text-[11px] text-stone-500">
-                    Sistem pembaruan mandiri (OTA APK Updater)
-                  </p>
-                </div>
-              </div>
-              <span className="font-mono font-bold text-xs px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
-                v{APP_CURRENT_VERSION}
-              </span>
-            </div>
-
-            {/* Tombol Cek Pembaruan */}
-            <div className="pt-1">
-              <button
-                onClick={handleCheckUpdateNow}
-                disabled={isCheckingUpdate}
-                className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-emerald-900/20 active:scale-98 transition-all cursor-pointer disabled:opacity-60"
-              >
-                {isCheckingUpdate ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>Memeriksa GitHub Releases...</span>
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="w-4 h-4" />
-                    <span>Cek Pembaruan Versi Terbaru Sekarang</span>
-                  </>
-                )}
-              </button>
-            </div>
-
-            {/* Feedback Pesan Hasil Cek */}
-            {updateFeedback && (
-              <div
-                className={`p-3 rounded-2xl border text-xs flex items-start gap-2.5 animate-in fade-in ${
-                  updateFeedback.type === 'success'
-                    ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                    : updateFeedback.type === 'error'
-                    ? 'bg-red-50 border-red-200 text-red-800'
-                    : 'bg-stone-50 border-stone-200 text-stone-700'
-                }`}
-              >
-                {updateFeedback.type === 'success' ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                ) : updateFeedback.type === 'error' ? (
-                  <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-                ) : (
-                  <Info className="w-4 h-4 text-stone-500 shrink-0 mt-0.5" />
-                )}
-
-                <div className="flex-1">
-                  <p className="font-semibold">{updateFeedback.msg}</p>
-                  {updateFeedback.info && (
-                    <div className="mt-2 flex items-center gap-2">
-                      <button
-                        onClick={() =>
-                          updateFeedback.info && onTriggerUpdateModal?.(updateFeedback.info)
-                        }
-                        className="py-1 px-3 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-[11px] flex items-center gap-1 shadow-xs cursor-pointer"
-                      >
-                        <Download className="w-3 h-3" />
-                        <span>Unduh APK v{updateFeedback.info.version}</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Card 2: Pengaturan Repositori GitHub */}
-          <form
-            onSubmit={handleSaveGithubSettings}
-            className="p-4 rounded-3xl bg-white border border-stone-200 shadow-xs space-y-3"
-          >
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-extrabold text-stone-900 uppercase tracking-wider flex items-center gap-1.5">
-                <Code2 className="w-4 h-4 text-stone-700" />
-                <span>Pengaturan Sumber Repositori GitHub</span>
-              </h3>
-              {githubSavedMsg && (
-                <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Tersimpan!</span>
-                </span>
-              )}
-            </div>
-
-            <p className="text-[11px] text-stone-500">
-              Tentukan akun dan repositori GitHub tempat kode ini disimpan agar aplikasi dapat mengambil rilis APK secara otomatis.
-            </p>
-
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1">
-                  Owner / Akun GitHub:
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Contoh: smbsyariah"
-                  value={repoOwner}
-                  onChange={(e) => setRepoOwner(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-stone-300 text-stone-900 text-xs font-mono focus:outline-hidden focus:border-emerald-600"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1">
-                  Nama Repositori:
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Contoh: bakso-qu-pos"
-                  value={repoName}
-                  onChange={(e) => setRepoName(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-stone-300 text-stone-900 text-xs font-mono focus:outline-hidden focus:border-emerald-600"
-                />
-              </div>
-            </div>
-
-            <div className="pt-1">
-              <label className="flex items-center gap-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={autoCheckStartup}
-                  onChange={(e) => setAutoCheckStartup(e.target.checked)}
-                  className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-stone-300"
-                />
-                <span className="text-xs text-stone-700 font-medium">
-                  Periksa pembaruan secara otomatis saat aplikasi dibuka
-                </span>
-              </label>
-            </div>
-
-            <div className="pt-2 flex items-center justify-between gap-2 border-t border-stone-100">
-              <a
-                href={`https://github.com/${repoOwner}/${repoName}/releases`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[11px] text-stone-500 hover:text-emerald-700 flex items-center gap-1 font-medium underline"
-              >
-                <span>Buka GitHub Releases</span>
-                <ExternalLink className="w-3 h-3" />
-              </a>
-
-              <button
-                type="submit"
-                className="py-2 px-4 rounded-xl bg-stone-900 hover:bg-stone-800 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer"
-              >
-                <Check className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Simpan Pengaturan</span>
-              </button>
-            </div>
-          </form>
-
-          {/* Card 3: Cara Kerja Alur CI/CD Otomatis */}
-          <div className="p-4 rounded-3xl bg-stone-50 border border-stone-200 space-y-2.5 text-xs text-stone-600">
-            <h4 className="font-extrabold text-stone-900 flex items-center gap-1.5">
-              <ShieldCheck className="w-4 h-4 text-emerald-600" />
-              <span>Alur Kerja Otomatis (CI/CD GitHub):</span>
-            </h4>
-            <ol className="list-decimal list-inside space-y-1.5 text-[11px] text-stone-600 leading-relaxed">
-              <li>
-                <strong className="text-stone-800">Push ke GitHub:</strong> Lakukan{' '}
-                <code className="bg-stone-200 px-1 py-0.5 rounded text-[10px] text-stone-900 font-mono">
-                  git push origin main
-                </code>
-                .
-              </li>
-              <li>
-                <strong className="text-stone-800">Auto Version:</strong> GitHub Actions membaca nomor run dan membuat versi baru secara otomatis (misal{' '}
-                <code className="bg-stone-200 px-1 py-0.5 rounded text-[10px] text-stone-900 font-mono">
-                  v1.2.x
-                </code>
-                ).
-              </li>
-              <li>
-                <strong className="text-stone-800">Auto Action & Build APK:</strong> Action mengkompilasi bundel web, menyinkronkan Capacitor, dan mem-build APK native Android.
-              </li>
-              <li>
-                <strong className="text-stone-800">Auto Release:</strong> File APK dan metadata rilis diunggah ke GitHub Releases publik secara otomatis.
-              </li>
-              <li>
-                <strong className="text-stone-800">App Auto Update:</strong> Begitu pengguna membuka aplikasi di HP, sistem mendeteksi rilis baru dan menampilkan tombol unduh APK instan!
-              </li>
-            </ol>
           </div>
         </div>
       )}
