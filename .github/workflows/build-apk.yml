@@ -1,0 +1,265 @@
+name: CI/CD - Auto Version, Build APK & Auto Release
+
+on:
+  push:
+    branches: [ "**" ]
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      manual_note:
+        description: 'Catatan Rilis Tambahan (Opsional)'
+        required: false
+        default: 'Pembaruan rilis manual via GitHub Actions'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Auto Version, Build APK & Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 1. Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 2. Setup Node.js (v22 LTS)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: 3. Set up JDK 21 dengan Gradle Cache
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: 4. Setup Android SDK Tools & Licenses
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platforms;android-35 build-tools;35.0.0'
+
+      - name: 5. Hitung Auto Versioning (Semantic & Run Number)
+        id: versioning
+        run: |
+          # Ambil base version dari package.json (misal 1.2.1)
+          BASE_VER=$(node -p "try { require('./package.json').version } catch(e) { '1.2.1' }")
+          echo "Base package.json version: $BASE_VER"
+
+          # Format versi otomatis: 1.2.<run_number>
+          MAJOR_MINOR=$(echo "$BASE_VER" | cut -d. -f1,2)
+          RUN_NUM="${{ github.run_number }}"
+          AUTO_VER="${MAJOR_MINOR}.${RUN_NUM}"
+          VERSION_CODE=$((100 + RUN_NUM))
+          BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          echo "APP_VERSION=${AUTO_VER}" >> $GITHUB_ENV
+          echo "VERSION_CODE=${VERSION_CODE}" >> $GITHUB_ENV
+          echo "BUILD_DATE=${BUILD_DATE}" >> $GITHUB_ENV
+          echo "TAG_NAME=v${AUTO_VER}" >> $GITHUB_ENV
+
+          echo "========================================="
+          echo "🚀 GENERATED AUTO VERSION: v${AUTO_VER}"
+          echo "🔢 ANDROID VERSION CODE: ${VERSION_CODE}"
+          echo "📅 BUILD DATE: ${BUILD_DATE}"
+          echo "========================================="
+
+          # Tulis file version.json untuk aplikasi frontend
+          mkdir -p public
+          cat << EOF > public/version.json
+          {
+            "version": "${AUTO_VER}",
+            "versionCode": ${VERSION_CODE},
+            "buildNumber": ${RUN_NUM},
+            "gitSha": "${{ github.sha }}",
+            "builtAt": "${BUILD_DATE}"
+          }
+          EOF
+
+          # Sinkronkan versi ke package.json
+          npm version "${AUTO_VER}" --no-git-tag-version --allow-same-version || true
+
+      - name: 6. Prepare Keystore & Android Variables
+        run: |
+          # Siapkan .env
+          if [ ! -f .env ]; then
+            cp .env.example .env 2>/dev/null || touch .env
+          fi
+
+          # Buat debug keystore jika belum ada
+          mkdir -p ~/.android
+          if [ -f debug.keystore.base64 ]; then
+            base64 -d debug.keystore.base64 > debug.keystore
+            cp debug.keystore ~/.android/debug.keystore 2>/dev/null || true
+          elif [ ! -f debug.keystore ]; then
+            keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+            cp debug.keystore ~/.android/debug.keystore 2>/dev/null || true
+          fi
+
+          # Update versi di android/app/build.gradle secara dinamis
+          if [ -f "android/app/build.gradle" ]; then
+            sed -i "s/versionCode [0-9]*/versionCode ${VERSION_CODE}/" android/app/build.gradle
+            sed -i "s/versionName \".*\"/versionName \"${APP_VERSION}\"/" android/app/build.gradle
+            echo "Updated android/app/build.gradle with versionCode=${VERSION_CODE} and versionName=${APP_VERSION}"
+          fi
+
+      - name: 7. Install Dependencies & Build Web App
+        run: |
+          npm install --legacy-peer-deps
+          npm run build
+
+      - name: 8. Inisialisasi & Sinkronisasi Platform Android Native
+        run: |
+          # Inisialisasi platform android jika belum ada
+          if [ ! -f "android/gradlew" ]; then
+            echo "Membuat platform android native via Capacitor..."
+            rm -rf android
+            npx cap add android
+          fi
+
+          echo "Menyinkronkan aset web ke Android..."
+          npx cap sync android
+
+          # Konfigurasi variables.gradle ke SDK 35 yang kompatibel
+          cat << 'EOF' > android/variables.gradle
+          ext {
+              minSdkVersion = 24
+              compileSdkVersion = 35
+              targetSdkVersion = 35
+              androidxActivityVersion = '1.9.3'
+              androidxAppCompatVersion = '1.7.0'
+              androidxCoordinatorLayoutVersion = '1.2.0'
+              androidxCoreVersion = '1.15.0'
+              androidxFragmentVersion = '1.8.5'
+              coreSplashScreenVersion = '1.0.1'
+              androidxWebkitVersion = '1.12.1'
+              junitVersion = '4.13.2'
+              androidxJunitVersion = '1.2.1'
+              androidxEspressoCoreVersion = '3.6.1'
+              cordovaAndroidVersion = '14.0.1'
+          }
+          EOF
+
+          # Konfigurasi gradle.properties optimal untuk CI
+          cat << 'EOF' > android/gradle.properties
+          org.gradle.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=512m
+          org.gradle.daemon=false
+          org.gradle.parallel=false
+          android.useAndroidX=true
+          android.enableJetifier=true
+          android.builder.sdkDownload=true
+          EOF
+
+          # Beri izin eksekusi gradlew di root dan di folder android
+          chmod +x android/gradlew 2>/dev/null || true
+          chmod +x gradlew 2>/dev/null || true
+
+      - name: 9. Build APK with Gradle
+        run: |
+          chmod +x android/gradlew gradlew 2>/dev/null || true
+          if [ -f "./gradlew" ]; then
+            ./gradlew assembleDebug --no-daemon --stacktrace -x test -x lint
+          else
+            cd android
+            ./gradlew assembleDebug --no-daemon --stacktrace -x test -x lint
+            cd ..
+          fi
+
+      - name: 10. Siapkan File APK & Metadata Release
+        run: |
+          mkdir -p output-apk
+
+          # Cari file APK dari build output
+          APK_FILE=""
+          if [ -f "android/app/build/outputs/apk/debug/app-debug.apk" ]; then
+            APK_FILE="android/app/build/outputs/apk/debug/app-debug.apk"
+          else
+            APK_FILE=$(find android/app/build/outputs/apk -type f -name "*.apk" 2>/dev/null | head -n 1)
+          fi
+
+          if [ -z "$APK_FILE" ]; then
+            APK_FILE=$(find . -type f -name "*debug.apk" -not -path "*/node_modules/*" 2>/dev/null | head -n 1)
+          fi
+
+          if [ -n "$APK_FILE" ] && [ -f "$APK_FILE" ]; then
+            # Copy dengan nama versi spesifik dan alias latest
+            cp "$APK_FILE" "output-apk/AppQu-BaksoQu-v${APP_VERSION}.apk"
+            cp "$APK_FILE" "output-apk/AppQu-BaksoQu-latest.apk"
+
+            COMMIT_MSG="${{ github.event.head_commit.message }}"
+            if [ -z "$COMMIT_MSG" ]; then
+              COMMIT_MSG="Pembaruan rilis build #${{ github.run_number }}"
+            fi
+
+            # Buat file latest-release.json untuk fitur Auto-Update in-app
+            cat << EOF > output-apk/latest-release.json
+            {
+              "version": "${APP_VERSION}",
+              "versionCode": ${VERSION_CODE},
+              "tagName": "v${APP_VERSION}",
+              "releaseName": "AppQu BaksoQu v${APP_VERSION}",
+              "releaseDate": "${BUILD_DATE}",
+              "apkName": "AppQu-BaksoQu-v${APP_VERSION}.apk",
+              "downloadUrl": "https://github.com/${{ github.repository }}/releases/download/v${APP_VERSION}/AppQu-BaksoQu-v${APP_VERSION}.apk",
+              "latestDownloadUrl": "https://github.com/${{ github.repository }}/releases/latest/download/AppQu-BaksoQu-latest.apk",
+              "changelog": "${COMMIT_MSG}",
+              "mandatory": false
+            }
+            EOF
+
+            echo "========================================="
+            echo "✅ File APK Siap:"
+            ls -lh output-apk/*.apk
+            echo "✅ Metadata latest-release.json:"
+            cat output-apk/latest-release.json
+            echo "========================================="
+          else
+            echo "❌ ERROR: File APK tidak ditemukan di build outputs!"
+            find . -name "*.apk" || true
+            exit 1
+          fi
+
+      - name: 11. Upload APK Artifact ke GitHub Actions
+        uses: actions/upload-artifact@v4
+        with:
+          name: AppQu-BaksoQu-v${{ env.APP_VERSION }}-APK
+          path: output-apk/*
+          retention-days: 30
+
+      - name: 12. Buat Auto Git Tag & GitHub Release Otomatis
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/')
+        with:
+          tag_name: v${{ env.APP_VERSION }}
+          name: "AppQu BaksoQu v${{ env.APP_VERSION }} (Auto Release)"
+          body: |
+            ## 🚀 Pembaruan Otomatis AppQu BaksoQu v${{ env.APP_VERSION }}
+
+            - **Versi**: `v${{ env.APP_VERSION }}`
+            - **Android Version Code**: `${{ env.VERSION_CODE }}`
+            - **Nomor Build**: #${{ github.run_number }}
+            - **Commit**: `${{ github.sha }}`
+            - **Pesan Commit**: ${{ github.event.head_commit.message }}
+            - **Tanggal Rilis**: ${{ env.BUILD_DATE }}
+
+            ---
+            ### 📥 Unduh File Instalasi APK:
+            1. **Versi Spesifik**: [AppQu-BaksoQu-v${{ env.APP_VERSION }}.apk](https://github.com/${{ github.repository }}/releases/download/v${{ env.APP_VERSION }}/AppQu-BaksoQu-v${{ env.APP_VERSION }}.apk)
+            2. **Direct Latest Link**: [AppQu-BaksoQu-latest.apk](https://github.com/${{ github.repository }}/releases/latest/download/AppQu-BaksoQu-latest.apk)
+
+            ---
+            ### 🔄 Sistem Auto-Update:
+            Aplikasi yang terpasang di perangkat Android akan otomatis mendeteksi pembaruan ini melalui endpoint release dan memberikan notifikasi pembaruan instan (*In-App Auto Update*).
+          files: |
+            output-apk/AppQu-BaksoQu-v${{ env.APP_VERSION }}.apk
+            output-apk/AppQu-BaksoQu-latest.apk
+            output-apk/latest-release.json
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
